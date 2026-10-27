@@ -1,0 +1,4 @@
+# Keep Go formatting and generated release metadata identical on all runners.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
