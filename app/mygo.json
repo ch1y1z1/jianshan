@@ -2,7 +2,7 @@
   "name": "见山",
   "identifier": "com.chiyizi.jianshan",
   "slug": "jianshan",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "out": "build",
   "macos": {
     "minimumSystemVersion": "13.0"

@@ -44,13 +44,14 @@ type app struct {
 	cancel              context.CancelFunc
 	jobs                chan previewJob
 	urgentJobs          chan previewJob
+	preloadJobs         chan previewJob
 	images              map[imageKey]*imageEntry
 	cacheClock          uint64
 }
 
 func newApp() *app {
 	ctx, cancel := context.WithCancel(context.Background())
-	a := &app{selected: -1, gridSelected: -1, mode: viewSingle, infoOpen: true, mainPercent: 77, gridSize: defaultGridSize, ctx: ctx, cancel: cancel, jobs: make(chan previewJob, 64), urgentJobs: make(chan previewJob, 16), images: make(map[imageKey]*imageEntry)}
+	a := &app{selected: -1, gridSelected: -1, mode: viewSingle, infoOpen: true, mainPercent: 77, gridSize: defaultGridSize, ctx: ctx, cancel: cancel, jobs: make(chan previewJob, 64), urgentJobs: make(chan previewJob, 16), preloadJobs: make(chan previewJob, 32), images: make(map[imageKey]*imageEntry)}
 	a.grid.Selected = &a.gridSelected
 	a.grid.Label = func(i int) string {
 		items := a.visiblePhotos()

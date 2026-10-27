@@ -28,12 +28,13 @@ type imageKey struct {
 	edge  int
 }
 type imageEntry struct {
-	bitmap  *ui.Bitmap
-	err     error
-	pending bool
-	used    uint64
-	bytes   int64
-	cancel  context.CancelFunc
+	bitmap     *ui.Bitmap
+	err        error
+	pending    bool
+	background bool
+	used       uint64
+	bytes      int64
+	cancel     context.CancelFunc
 }
 
 type previewJob struct {
@@ -48,6 +49,14 @@ type previewJob struct {
 // run concurrently; folder changes cancel outstanding work and stale results
 // cannot enter the next folder's cache.
 func (a *app) image(p photo, large bool, requestedEdge ...int) (*ui.Bitmap, error, bool) {
+	return a.requestImage(p, large, large, false, requestedEdge...)
+}
+
+func (a *app) preloadImage(p photo, requestedEdge int) {
+	_, _, _ = a.requestImage(p, true, false, true, requestedEdge)
+}
+
+func (a *app) requestImage(p photo, large, urgent, background bool, requestedEdge ...int) (*ui.Bitmap, error, bool) {
 	edge := thumbnailEdge
 	if large {
 		edge = previewEdge
@@ -59,23 +68,36 @@ func (a *app) image(p photo, large bool, requestedEdge ...int) (*ui.Bitmap, erro
 	key := imageKey{path: p.Path, large: large, edge: edge}
 	a.cacheClock++
 	if e := a.images[key]; e != nil {
-		e.used = a.cacheClock
-		return e.bitmap, e.err, e.pending
+		if urgent && e.pending && e.background {
+			if e.cancel != nil {
+				e.cancel()
+			}
+			delete(a.images, key)
+		} else {
+			e.used = a.cacheClock
+			return e.bitmap, e.err, e.pending
+		}
 	}
-	// Keep compatibility with entries created before size-aware keys existed.
 	if e := a.images[imageKey{path: p.Path, large: large}]; e != nil {
-		e.used = a.cacheClock
-		return e.bitmap, e.err, e.pending
+		if urgent && e.pending && e.background {
+			if e.cancel != nil {
+				e.cancel()
+			}
+			delete(a.images, imageKey{path: p.Path, large: large})
+		} else {
+			e.used = a.cacheClock
+			return e.bitmap, e.err, e.pending
+		}
 	}
 	if a.win == nil {
 		return nil, nil, false
 	}
 	ctx, cancel := context.WithCancel(a.ctx)
-	e := &imageEntry{pending: true, used: a.cacheClock, cancel: cancel}
+	e := &imageEntry{pending: true, background: background, used: a.cacheClock, cancel: cancel}
 	job := previewJob{key: key, photo: p, generation: a.generation, ctx: ctx, entry: e}
 	a.images[key] = e
 	select {
-	case a.previewQueue(large) <- job:
+	case a.previewQueue(large, urgent, background) <- job:
 	default:
 		delete(a.images, key)
 		cancel()
@@ -83,12 +105,25 @@ func (a *app) image(p photo, large bool, requestedEdge ...int) (*ui.Bitmap, erro
 	}
 	return nil, nil, true
 }
-
-func (a *app) previewQueue(large bool) chan previewJob {
-	if large {
+func (a *app) previewQueue(large, urgent, background bool) chan previewJob {
+	if background {
+		return a.preloadJobs
+	}
+	if urgent {
 		return a.urgentJobs
 	}
 	return a.jobs
+}
+
+func (a *app) cancelStalePreloads(keep map[string]bool) {
+	for key, entry := range a.images {
+		if key.large && entry.background && entry.pending && !keep[key.path] {
+			if entry.cancel != nil {
+				entry.cancel()
+			}
+			delete(a.images, key)
+		}
+	}
 }
 
 func imageEdgeBucket(edge int) int {
@@ -120,8 +155,8 @@ func (a *app) startWorkers() {
 	for range 2 {
 		go func() {
 			for {
-				// Poll the urgent queue first so opening a photo is not stuck
-				// behind thumbnails that were requested by the grid.
+				// Poll urgent work first, then regular visible work, and only then
+				// consume adjacent-photo preloads.
 				select {
 				case job, ok := <-a.urgentJobs:
 					if !ok {
@@ -130,16 +165,29 @@ func (a *app) startWorkers() {
 					a.processPreviewJob(job)
 				default:
 					select {
-					case job, ok := <-a.urgentJobs:
-						if !ok {
-							return
-						}
-						a.processPreviewJob(job)
 					case job, ok := <-a.jobs:
 						if !ok {
 							return
 						}
 						a.processPreviewJob(job)
+					default:
+						select {
+						case job, ok := <-a.urgentJobs:
+							if !ok {
+								return
+							}
+							a.processPreviewJob(job)
+						case job, ok := <-a.jobs:
+							if !ok {
+								return
+							}
+							a.processPreviewJob(job)
+						case job, ok := <-a.preloadJobs:
+							if !ok {
+								return
+							}
+							a.processPreviewJob(job)
+						}
 					}
 				}
 			}

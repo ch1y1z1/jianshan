@@ -162,6 +162,18 @@ func (a *app) drainPreviewQueues() {
 				return
 			}
 		default:
+			goto preload
+		}
+	}
+
+preload:
+	for {
+		select {
+		case _, open := <-a.preloadJobs:
+			if !open {
+				return
+			}
+		default:
 			return
 		}
 	}
