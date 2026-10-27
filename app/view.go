@@ -287,6 +287,7 @@ func (a *app) imageStage(c *ui.Context) {
 	items := a.visiblePhotos()
 	idx := a.currentVisibleIndex(items)
 	previewTarget := a.singlePreviewEdge(c)
+	a.preloadAdjacent(items, idx, previewTarget)
 	ui.Column(c.Key("single-stage")).Fill().MinHeight(0).Background(ui.Hex("#111315")).Children(func() {
 		ui.Box(c.Key("image-area")).Grow(1).MinHeight(0).Center().Children(func() {
 			var placeholder *ui.Bitmap
@@ -354,6 +355,26 @@ func (a *app) singlePreviewEdge(c *ui.Context) int {
 		}
 	}
 	return imageEdgeBucket(int(max(w, h) * 2))
+}
+
+const singlePreloadRadius = 2
+
+func (a *app) preloadAdjacent(items []photo, idx, edge int) {
+	keep := make(map[string]bool, singlePreloadRadius*2+1)
+	if idx >= 0 && idx < len(items) {
+		for n := max(0, idx-singlePreloadRadius); n <= min(len(items)-1, idx+singlePreloadRadius); n++ {
+			keep[items[n].Path] = true
+		}
+	}
+	a.cancelStalePreloads(keep)
+	if idx < 0 || idx >= len(items) {
+		return
+	}
+	for n := max(0, idx-singlePreloadRadius); n <= min(len(items)-1, idx+singlePreloadRadius); n++ {
+		if n != idx {
+			a.preloadImage(items[n], edge)
+		}
+	}
 }
 
 func (a *app) edgeNavigation(c *ui.Context, key, label string, icon *ui.SVG, click func()) {
