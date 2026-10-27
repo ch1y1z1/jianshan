@@ -49,8 +49,10 @@ jobs:
       - name: Install Windows installer tool
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y nsis
+          if ! command -v makensis > /dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y nsis
+          fi
       - name: Build and sign update archives
         env:
           GH_TOKEN: ${{ github.token }}

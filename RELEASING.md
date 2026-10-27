@@ -4,7 +4,7 @@
 
 ## 持续集成
 
-推送 `main` 或提交 PR 后，CI 在 macOS、Windows 和 Linux 上检查格式、运行 `go vet`、测试、构建正式模式二进制，并核对发布元数据。Go 与 MyGo CLI 的版本由 `app/go.mod` 固定。
+推送 `main` 或提交 PR 后，CI 在 macOS 和 Windows 上检查格式、运行 `go vet`、测试、构建正式模式二进制，并核对发布元数据。Linux 仅参与安装包构建与发布，不运行依赖渲染库下载的检查任务。Go 与 MyGo CLI 的版本由 `app/go.mod` 固定。
 
 推送 `v*` 标签触发发布流程：重新跑 CI，核对标签、`app/mygo.json` 和 `app/CHANGELOG.md`；构建 macOS arm64/amd64、Windows amd64、Linux amd64；验签并汇总全部归档与安装包；先上传至草稿，全部成功后公开发布。预发布标签会标记为 prerelease，不成为稳定版 latest。已公开的版本不允许被流程覆盖。
 
