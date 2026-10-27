@@ -22,6 +22,7 @@ type app struct {
 	grid                            ui.GridState
 	gridSelected                    int
 	focusGrid                       bool
+	viewer                          imageViewport
 
 	filter                              filterState
 	sort                                sortMode
@@ -76,6 +77,7 @@ func (a *app) loadFolderAsync(path string) {
 	a.generation++
 	generation, ctx, win := a.generation, a.ctx, a.win
 	a.images = make(map[imageKey]*imageEntry)
+	a.viewer = imageViewport{}
 	a.loading, a.status = true, ""
 	go func() {
 		dir, selectedPath := path, ""
@@ -137,6 +139,7 @@ func (a *app) openFolder() {
 	}()
 }
 func (a *app) toggleGrid() {
+	a.viewer.reset()
 	if a.mode == viewGrid {
 		a.mode = viewSingle
 		return

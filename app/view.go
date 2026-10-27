@@ -25,7 +25,9 @@ func (a *app) view(c *ui.Context) {
 		}
 	})
 	c.OnShortcut(0, ui.KeyEscape, func() {
-		if a.toolsOpen {
+		if a.viewer.pressed {
+			a.viewer.pressed, a.viewer.boxing = false, false
+		} else if a.toolsOpen {
 			a.toolsOpen, a.filterOpen = false, false
 		} else if a.mode == viewSingle {
 			a.toggleGrid()
@@ -33,6 +35,14 @@ func (a *app) view(c *ui.Context) {
 			a.mode = viewSingle
 		}
 	})
+	if a.mode == viewSingle {
+		for _, mods := range []ui.Modifiers{0, ui.Cmd} {
+			c.OnShortcut(mods, ui.KeyEqual, func() { a.viewer.zoomCenter(1.25) })
+			c.OnShortcut(mods|ui.Shift, ui.KeyEqual, func() { a.viewer.zoomCenter(1.25) })
+			c.OnShortcut(mods, ui.KeyMinus, func() { a.viewer.zoomCenter(.8) })
+			c.OnShortcut(mods, ui.Key0, a.viewer.reset)
+		}
+	}
 	t := c.Theme()
 	root := ui.Column(c).Fill().Background(t.Background)
 	root.Children(func() {
@@ -267,14 +277,17 @@ func (a *app) imageStage(c *ui.Context) {
 	if !ok {
 		return
 	}
+	if a.viewer.path != p.Path {
+		a.viewer = imageViewport{path: p.Path, viewport: a.viewer.viewport}
+	}
 	items := a.visiblePhotos()
 	idx := a.currentVisibleIndex(items)
 	ui.Column(c.Key("single-stage")).Fill().MinHeight(0).Background(ui.Hex("#111315")).Children(func() {
-		ui.Box(c.Key("image-area")).Grow(1).MinHeight(0).Center().Padding(16, 20, 4).Children(func() {
+		ui.Box(c.Key("image-area")).Grow(1).MinHeight(0).Center().Children(func() {
 			bm, err, pending := a.image(p, true)
 			switch {
 			case bm != nil:
-				ui.Image(c, bm).Fit(ui.Contain).Fill().MinWidth(0).MinHeight(0).Label("图片预览")
+				a.photoCanvas(c, bm)
 			case pending:
 				ui.Text(c, "正在读取图片…").TextColor(t.TextMuted).FontSize(12)
 			default:
@@ -286,10 +299,19 @@ func (a *app) imageStage(c *ui.Context) {
 				})
 			}
 		})
-		ui.Row(c.Key("navigation")).Height(44).Shrink(0).Center().Gap(16).Children(func() {
+		ui.Row(c.Key("navigation")).Height(44).Shrink(0).Padding(0, 12).AlignItems(ui.Center).Gap(8).Children(func() {
 			iconButton(c, "previous", "上一张", iconLeft, false).Disabled(idx <= 0).OnClick(func() { a.selectRelative(-1) })
-			ui.Text(c, p.Name).FontSize(11).TextColor(ui.Hex("#a0aaa3")).SingleLine().MaxWidth(380)
 			iconButton(c, "next", "下一张", iconRight, false).Disabled(idx < 0 || idx >= len(items)-1).OnClick(func() { a.selectRelative(1) })
+			ui.Text(c, p.Name).FontSize(11).TextColor(ui.Hex("#a0aaa3")).SingleLine().Grow(1).MinWidth(0)
+			ready := a.viewer.width > 0
+			iconButton(c, "zoom-out", "缩小", iconMinus, false).Disabled(!ready).OnClick(func() { a.viewer.zoomCenter(.8) })
+			label := "适应"
+			if ready {
+				label = fmt.Sprintf("%.0f%%", a.viewer.currentScale()*100)
+			}
+			ui.Button(c.Key("zoom-actual"), label).FontSize(11).MinWidth(48).Label("100% 显示").Tooltip("按预览像素 100% 显示").Disabled(!ready).OnClick(func() { a.viewer.zoomCenter(1 / a.viewer.currentScale()) })
+			iconButton(c, "zoom-in", "放大", iconPlus, false).Disabled(!ready).OnClick(func() { a.viewer.zoomCenter(1.25) })
+			iconButton(c, "zoom-fit", "适应窗口", iconFit, false).Tooltip("恢复适应窗口 · 0").Disabled(!ready).OnClick(a.viewer.reset)
 		})
 	})
 }
@@ -317,7 +339,7 @@ func (a *app) gridView(c *ui.Context) {
 		})
 	}).Fill().Padding(12)
 	grid.OnChange(func() { a.selectVisible(a.visiblePhotos(), a.gridSelected) })
-	grid.OnSubmit(func() { a.selectVisible(a.visiblePhotos(), a.gridSelected); a.mode = viewSingle })
+	grid.OnSubmit(func() { a.selectVisible(a.visiblePhotos(), a.gridSelected); a.viewer.reset(); a.mode = viewSingle })
 	if a.focusGrid {
 		a.grid.Focus(c)
 		a.focusGrid = false

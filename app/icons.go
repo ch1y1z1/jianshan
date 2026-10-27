@@ -14,4 +14,7 @@ var (
 	iconTools  = lineIcon(`<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="9" cy="18" r="2"/>`)
 	iconLeft   = lineIcon(`<path d="m15 5-7 7 7 7"/>`)
 	iconRight  = lineIcon(`<path d="m9 5 7 7-7 7"/>`)
+	iconMinus  = lineIcon(`<path d="M5 12h14"/>`)
+	iconPlus   = lineIcon(`<path d="M5 12h14m-7-7v14"/>`)
+	iconFit    = lineIcon(`<path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/>`)
 )
