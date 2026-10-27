@@ -33,6 +33,7 @@ type imageEntry struct {
 	err        error
 	pending    bool
 	background bool
+	full       bool
 	used       uint64
 	bytes      int64
 	cancel     context.CancelFunc
@@ -50,14 +51,18 @@ type previewJob struct {
 // run concurrently; folder changes cancel outstanding work and stale results
 // cannot enter the next folder's cache.
 func (a *app) image(p photo, large bool, requestedEdge ...int) (*ui.Bitmap, error, bool) {
-	return a.requestImage(p, large, large, false, requestedEdge...)
+	return a.requestImage(p, large, large, false, false, requestedEdge...)
 }
 
 func (a *app) preloadImage(p photo, requestedEdge int) {
-	_, _, _ = a.requestImage(p, true, false, true, requestedEdge)
+	_, _, _ = a.requestImage(p, true, false, true, false, requestedEdge)
 }
 
-func (a *app) requestImage(p photo, large, urgent, background bool, requestedEdge ...int) (*ui.Bitmap, error, bool) {
+func (a *app) preloadFullImage(p photo, requestedEdge int) {
+	_, _, _ = a.requestImage(p, true, true, true, true, requestedEdge)
+}
+
+func (a *app) requestImage(p photo, large, urgent, background, full bool, requestedEdge ...int) (*ui.Bitmap, error, bool) {
 	edge := thumbnailEdge
 	if large {
 		edge = previewEdge
@@ -90,7 +95,7 @@ func (a *app) requestImage(p photo, large, urgent, background bool, requestedEdg
 			return e.bitmap, e.err, e.pending
 		}
 	}
-	bestEdge := maxPreviewEdge + 1
+	bestEdge := int(^uint(0) >> 1)
 	var ready *imageEntry
 	for cachedKey, entry := range a.images {
 		if cachedKey.path == p.Path && cachedKey.large == large && !entry.pending && entry.bitmap != nil && cachedKey.edge >= edge && cachedKey.edge < bestEdge {
@@ -105,7 +110,7 @@ func (a *app) requestImage(p photo, large, urgent, background bool, requestedEdg
 		return nil, nil, false
 	}
 	ctx, cancel := context.WithCancel(a.ctx)
-	e := &imageEntry{pending: true, background: background, used: a.cacheClock, cancel: cancel}
+	e := &imageEntry{pending: true, background: background, full: full, used: a.cacheClock, cancel: cancel}
 	job := previewJob{key: key, photo: p, generation: a.generation, ctx: ctx, entry: e}
 	a.images[key] = e
 	select {
@@ -118,18 +123,20 @@ func (a *app) requestImage(p photo, large, urgent, background bool, requestedEdg
 	return nil, nil, true
 }
 func (a *app) previewQueue(large, urgent, background bool) chan previewJob {
-	if background {
-		return a.preloadJobs
-	}
 	if urgent {
 		return a.urgentJobs
+	}
+	if background {
+		return a.preloadJobs
 	}
 	return a.jobs
 }
 
-func (a *app) cancelStalePreloads(keep map[string]bool) {
+func (a *app) cancelStalePreloads(keep map[string]bool, currentPath string) {
 	for key, entry := range a.images {
-		if key.large && entry.background && entry.pending && !keep[key.path] {
+		staleFull := entry.full && key.path != currentPath
+		staleAdjacent := entry.background && !entry.full && !keep[key.path]
+		if key.large && entry.pending && (staleFull || staleAdjacent) {
 			if entry.cancel != nil {
 				entry.cancel()
 			}
@@ -139,7 +146,7 @@ func (a *app) cancelStalePreloads(keep map[string]bool) {
 }
 
 func imageEdgeBucket(edge int) int {
-	edge = max(1, min(maxPreviewEdge, edge))
+	edge = max(1, edge)
 	if edge <= thumbnailEdge {
 		return thumbnailEdge
 	}
@@ -153,6 +160,22 @@ func (a *app) cachedImage(p photo, large bool) *ui.Bitmap {
 			if best == nil || key.edge > 0 && key.edge > imageEdgeBucket(thumbnailEdge) {
 				best = entry
 			}
+		}
+	}
+	if best == nil {
+		return nil
+	}
+	a.cacheClock++
+	best.used = a.cacheClock
+	return best.bitmap
+}
+
+func (a *app) cachedImageAtLeast(p photo, large bool, edge int) *ui.Bitmap {
+	bestEdge := int(^uint(0) >> 1)
+	var best *imageEntry
+	for key, entry := range a.images {
+		if key.path == p.Path && key.large == large && key.edge >= edge && !entry.pending && entry.bitmap != nil && key.edge < bestEdge {
+			bestEdge, best = key.edge, entry
 		}
 	}
 	if best == nil {

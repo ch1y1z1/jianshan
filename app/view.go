@@ -292,23 +292,31 @@ func (a *app) imageStage(c *ui.Context) {
 	ui.Column(c.Key("single-stage")).Fill().MinHeight(0).Background(ui.Hex("#111315")).Children(func() {
 		ui.Box(c.Key("image-area")).Grow(1).MinHeight(0).Center().Children(func() {
 			var placeholder *ui.Bitmap
-			if p.Ext == ".jpg" || p.Ext == ".jpeg" || p.isRaw() {
-				placeholder = a.cachedImage(p, false)
-				if placeholder == nil {
-					// Decode a small first frame before the window-sized preview on
-					// direct opens. This avoids a blank stage and avoids decoding both
-					// sizes at the same time when no grid was visited first.
-					low, _, lowPending := a.image(p, false)
-					placeholder = low
-					if lowPending && low == nil {
-						ui.Text(c, "正在读取图片…").TextColor(t.TextMuted).FontSize(12)
-						return
+			var bm *ui.Bitmap
+			var err error
+			var pending bool
+			if ready := a.cachedImageAtLeast(p, true, previewTarget); ready != nil {
+				bm = ready
+			} else {
+				if p.Ext == ".jpg" || p.Ext == ".jpeg" || p.isRaw() {
+					placeholder = a.cachedImage(p, false)
+					if placeholder == nil {
+						// Decode a small first frame before the window-sized preview on
+						// direct opens. This avoids a blank stage and avoids decoding both
+						// sizes at the same time when no grid was visited first.
+						low, _, lowPending := a.image(p, false)
+						placeholder = low
+						if lowPending && low == nil {
+							ui.Text(c, "正在读取图片…").TextColor(t.TextMuted).FontSize(12)
+							return
+						}
 					}
 				}
+				bm, err, pending = a.image(p, true, previewTarget)
 			}
-			bm, err, pending := a.image(p, true, previewTarget)
 			switch {
 			case bm != nil:
+				a.preloadFullResolution(p, previewTarget)
 				a.photoCanvas(c, bm)
 			case pending:
 				if placeholder != nil {
@@ -377,8 +385,21 @@ func (a *app) zoomedPreviewEdge(p photo, base int) int {
 	target := int(float32(base) * factor)
 	if maxSourceEdge > 0 {
 		target = min(target, maxSourceEdge)
+	} else {
+		target = min(target, maxPreviewEdge)
 	}
 	return imageEdgeBucket(target)
+}
+
+func (a *app) preloadFullResolution(p photo, currentEdge int) {
+	target := maxPreviewEdge
+	if p.Meta.Width > 0 && p.Meta.Height > 0 {
+		target = max(p.Meta.Width, p.Meta.Height)
+	}
+	target = imageEdgeBucket(target)
+	if target > currentEdge {
+		a.preloadFullImage(p, target)
+	}
 }
 
 const singlePreloadRadius = 2
@@ -390,7 +411,11 @@ func (a *app) preloadAdjacent(items []photo, idx, edge int) {
 			keep[items[n].Path] = true
 		}
 	}
-	a.cancelStalePreloads(keep)
+	currentPath := ""
+	if idx >= 0 && idx < len(items) {
+		currentPath = items[idx].Path
+	}
+	a.cancelStalePreloads(keep, currentPath)
 	if idx < 0 || idx >= len(items) {
 		return
 	}
