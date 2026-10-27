@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/egoist/mygo/transfer"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -345,6 +346,9 @@ func (a *app) imageStage(c *ui.Context) {
 			iconButton(c, "previous", "上一张", iconLeft, false).Disabled(idx <= 0).OnClick(func() { a.selectRelative(-1) })
 			iconButton(c, "next", "下一张", iconRight, false).Disabled(idx < 0 || idx >= len(items)-1).OnClick(func() { a.selectRelative(1) })
 			ui.Text(c, p.Name).FontSize(11).TextColor(ui.Hex("#a0aaa3")).SingleLine().Grow(1).MinWidth(0)
+			if data, dragErr := transfer.FileData(p.Path); dragErr == nil {
+				ui.Button(c.Key("drag-photo"), "拖出图片").FontSize(11).Tooltip("按住拖到其他应用").DragData(data)
+			}
 			ready := a.viewer.width > 0
 			iconButton(c, "zoom-out", "缩小", iconMinus, false).Disabled(!ready).OnClick(func() { a.viewer.zoomCenter(.8) })
 			ui.Button(c.Key("zoom-fit-text"), "适合窗口").FontSize(11).MinWidth(68).Label("适合窗口").Tooltip("适合当前屏幕显示区域").Disabled(!ready).OnClick(a.viewer.reset)
@@ -449,7 +453,11 @@ func (a *app) gridView(c *ui.Context) {
 	items := a.visiblePhotos()
 	grid := ui.GridView(c.Key("photo-grid"), &a.grid, len(items), a.gridSize, a.gridSize-10, func(i int) {
 		p := items[i]
-		ui.Column(c).Fill().Padding(5).Gap(7).Children(func() {
+		tile := ui.Column(c).Fill().Padding(5).Gap(7)
+		if data, dragErr := transfer.FileData(p.Path); dragErr == nil {
+			tile = tile.DragData(data)
+		}
+		tile.Children(func() {
 			ui.Box(c).Grow(1).MinHeight(0).Center().Background(ui.Hex("#111315")).Radius(3).Clip().Children(func() {
 				bm, err, pending := a.image(p, false)
 				if bm != nil {
@@ -466,6 +474,14 @@ func (a *app) gridView(c *ui.Context) {
 			})
 			ui.Text(c, p.Name).FontSize(11).TextColor(t.TextMuted).SingleLine()
 		})
+		if tile.Clicked() {
+			a.selectVisible(items, i)
+		}
+		if tile.DoubleClicked() {
+			a.selectVisible(items, i)
+			a.viewer.reset()
+			a.mode = viewSingle
+		}
 	}).Fill().Padding(12)
 	grid.HandleInput(a.gridInput)
 	grid.OnChange(func() { a.selectVisible(a.visiblePhotos(), a.gridSelected) })
