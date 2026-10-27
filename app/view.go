@@ -286,8 +286,9 @@ func (a *app) imageStage(c *ui.Context) {
 	}
 	items := a.visiblePhotos()
 	idx := a.currentVisibleIndex(items)
-	previewTarget := a.singlePreviewEdge(c)
-	a.preloadAdjacent(items, idx, previewTarget)
+	baseTarget := a.singlePreviewEdge(c)
+	previewTarget := a.zoomedPreviewEdge(p, baseTarget)
+	a.preloadAdjacent(items, idx, baseTarget)
 	ui.Column(c.Key("single-stage")).Fill().MinHeight(0).Background(ui.Hex("#111315")).Children(func() {
 		ui.Box(c.Key("image-area")).Grow(1).MinHeight(0).Center().Children(func() {
 			var placeholder *ui.Bitmap
@@ -355,6 +356,29 @@ func (a *app) singlePreviewEdge(c *ui.Context) int {
 		}
 	}
 	return imageEdgeBucket(int(max(w, h) * 2))
+}
+
+func (a *app) zoomedPreviewEdge(p photo, base int) int {
+	if a.viewer.path != p.Path || a.viewer.width <= 0 || a.viewer.height <= 0 || a.viewer.scale <= 0 {
+		return base
+	}
+	fit := a.viewer.fitScale()
+	if fit <= 0 {
+		return base
+	}
+	factor := a.viewer.currentScale() / fit
+	if factor <= 1.25 {
+		return base
+	}
+	maxSourceEdge := 0
+	if p.Meta.Width > 0 && p.Meta.Height > 0 {
+		maxSourceEdge = max(p.Meta.Width, p.Meta.Height)
+	}
+	target := int(float32(base) * factor)
+	if maxSourceEdge > 0 {
+		target = min(target, maxSourceEdge)
+	}
+	return imageEdgeBucket(target)
 }
 
 const singlePreloadRadius = 2

@@ -156,6 +156,9 @@ func (a *app) photoInput(ev ui.InputEvent) bool {
 func (a *app) photoCanvas(c *ui.Context, bm *ui.Bitmap) {
 	v := &a.viewer
 	w, h := bm.Size()
+	if v.width > 0 && v.height > 0 && v.scale > 0 && w > 0 && h > 0 {
+		v.scale *= v.width / float32(w)
+	}
 	v.width, v.height = float32(w), float32(h)
 	canvas := ui.Box(c.Key("photo-canvas")).Fill().MinWidth(0).MinHeight(0).Clip().Focusable().Bind(&v.handle).Label("图片预览").Description("双击返回网格；滚轮或捏合缩放；拖动平移；按住 Ctrl 拖框放大")
 	bounds := canvas.Bounds()

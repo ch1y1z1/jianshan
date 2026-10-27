@@ -18,6 +18,7 @@ import (
 const (
 	thumbnailEdge   = 420
 	previewEdge     = 4096
+	maxPreviewEdge  = 8192
 	thumbnailBudget = 64 << 20
 	previewBudget   = 192 << 20
 )
@@ -89,6 +90,17 @@ func (a *app) requestImage(p photo, large, urgent, background bool, requestedEdg
 			return e.bitmap, e.err, e.pending
 		}
 	}
+	bestEdge := maxPreviewEdge + 1
+	var ready *imageEntry
+	for cachedKey, entry := range a.images {
+		if cachedKey.path == p.Path && cachedKey.large == large && !entry.pending && entry.bitmap != nil && cachedKey.edge >= edge && cachedKey.edge < bestEdge {
+			bestEdge, ready = cachedKey.edge, entry
+		}
+	}
+	if ready != nil {
+		ready.used = a.cacheClock
+		return ready.bitmap, ready.err, false
+	}
 	if a.win == nil {
 		return nil, nil, false
 	}
@@ -127,7 +139,7 @@ func (a *app) cancelStalePreloads(keep map[string]bool) {
 }
 
 func imageEdgeBucket(edge int) int {
-	edge = max(1, min(previewEdge, edge))
+	edge = max(1, min(maxPreviewEdge, edge))
 	if edge <= thumbnailEdge {
 		return thumbnailEdge
 	}
