@@ -24,7 +24,7 @@ func TestPhotoViewportInteractions(t *testing.T) {
 	if a.viewer.currentScale() <= fit {
 		t.Fatal("wheel did not zoom the photo")
 	}
-	if err := tt.Click("适应窗口"); err != nil {
+	if err := tt.Click("适合窗口"); err != nil {
 		t.Fatal(err)
 	}
 	if a.viewer.scale != 0 {

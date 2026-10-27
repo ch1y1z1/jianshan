@@ -97,9 +97,41 @@ func (a *app) visiblePhotos() []photo {
 		}
 	}
 	a.sortPhotos(out)
+	a.pruneImageCache(out)
 	a.visible, a.visibleValid = out, true
 	a.lastFilter, a.lastSort, a.lastDescending = a.filter, a.sort, a.sortDescending
 	return out
+}
+
+// A filter can remove a large portion of the directory. Drop cached images
+// that cannot be shown in the new result. Ready images survive sorting;
+// pending work is canceled so the new viewport schedules its requests first.
+func (a *app) pruneImageCache(visible []photo) {
+	keep := make(map[string]bool, len(visible))
+	for _, p := range visible {
+		keep[p.Path] = true
+	}
+	for key, entry := range a.images {
+		if !keep[key.path] || entry.pending {
+			if entry.cancel != nil {
+				entry.cancel()
+			}
+			delete(a.images, key)
+		}
+	}
+	// All queued requests belong to the previous viewport. Empty the queue
+	// now, so a full queue of canceled work cannot prevent a new frame from
+	// enqueueing images (canceled workers publish no completion frame).
+	for {
+		select {
+		case _, open := <-a.jobs:
+			if !open {
+				return
+			}
+		default:
+			return
+		}
+	}
 }
 func (a *app) invalidatePhotos() { a.visibleValid = false }
 

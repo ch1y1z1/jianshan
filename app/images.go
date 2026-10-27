@@ -31,6 +31,7 @@ type imageEntry struct {
 	pending bool
 	used    uint64
 	bytes   int64
+	cancel  context.CancelFunc
 }
 
 type previewJob struct {
@@ -54,12 +55,14 @@ func (a *app) image(p photo, large bool) (*ui.Bitmap, error, bool) {
 	if a.win == nil {
 		return nil, nil, false
 	}
-	e := &imageEntry{pending: true, used: a.cacheClock}
-	job := previewJob{key: key, photo: p, generation: a.generation, ctx: a.ctx, entry: e}
+	ctx, cancel := context.WithCancel(a.ctx)
+	e := &imageEntry{pending: true, used: a.cacheClock, cancel: cancel}
+	job := previewJob{key: key, photo: p, generation: a.generation, ctx: ctx, entry: e}
 	select {
 	case a.jobs <- job:
 		a.images[key] = e
 	default:
+		cancel()
 		// The visible cells retry on the frame produced by the next completion.
 	}
 	return nil, nil, true
@@ -92,6 +95,8 @@ func (a *app) startWorkers() {
 					if a.generation != job.generation || a.images[job.key] != job.entry {
 						return
 					}
+					job.entry.cancel()
+					job.entry.cancel = nil
 					job.entry.bitmap, job.entry.err, job.entry.pending, job.entry.bytes = bitmap, err, false, size
 					a.trimImages(job.key.large, job.key)
 				})

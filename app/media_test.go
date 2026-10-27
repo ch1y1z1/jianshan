@@ -14,6 +14,31 @@ import (
 	"testing"
 )
 
+func TestFilterRefreshKeepsReadyCacheAndCancelsOldQueue(t *testing.T) {
+	a := newApp()
+	a.photos = []photo{{Path: "keep.jpg", Name: "keep.jpg", Ext: ".jpg"}, {Path: "drop.png", Name: "drop.png", Ext: ".png"}}
+	ready := &imageEntry{}
+	ctx, cancel := context.WithCancel(a.ctx)
+	pending := &imageEntry{pending: true, cancel: cancel}
+	a.images[imageKey{path: "keep.jpg"}] = ready
+	a.images[imageKey{path: "keep.jpg", large: true}] = pending
+	a.images[imageKey{path: "drop.png"}] = &imageEntry{}
+	a.jobs <- previewJob{ctx: ctx, entry: pending}
+	a.filter.Ext = ".jpg"
+	a.visiblePhotos()
+	if ctx.Err() == nil || len(a.jobs) != 0 {
+		t.Fatal("old decoding work was not canceled and drained")
+	}
+	if len(a.images) != 1 || a.images[imageKey{path: "keep.jpg"}] != ready {
+		t.Fatal("filter discarded usable cache or kept excluded images")
+	}
+	a.sortDescending = true
+	a.visiblePhotos()
+	if a.images[imageKey{path: "keep.jpg"}] != ready {
+		t.Fatal("sorting discarded reusable image data")
+	}
+}
+
 func jpegFixture(t *testing.T, w, h int) []byte {
 	t.Helper()
 	var b bytes.Buffer

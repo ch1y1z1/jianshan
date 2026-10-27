@@ -301,6 +301,12 @@ func (a *app) imageStage(c *ui.Context) {
 					}
 				})
 			}
+			if idx > 0 {
+				a.edgeNavigation(c, "left-edge", "上一张", iconLeft, func() { a.selectRelative(-1) })
+			}
+			if idx >= 0 && idx < len(items)-1 {
+				a.edgeNavigation(c, "right-edge", "下一张", iconRight, func() { a.selectRelative(1) })
+			}
 		})
 		ui.Row(c.Key("navigation")).Height(44).Shrink(0).Padding(0, 12).AlignItems(ui.Center).Gap(8).Children(func() {
 			iconButton(c, "previous", "上一张", iconLeft, false).Disabled(idx <= 0).OnClick(func() { a.selectRelative(-1) })
@@ -308,15 +314,29 @@ func (a *app) imageStage(c *ui.Context) {
 			ui.Text(c, p.Name).FontSize(11).TextColor(ui.Hex("#a0aaa3")).SingleLine().Grow(1).MinWidth(0)
 			ready := a.viewer.width > 0
 			iconButton(c, "zoom-out", "缩小", iconMinus, false).Disabled(!ready).OnClick(func() { a.viewer.zoomCenter(.8) })
-			label := "适应"
-			if ready {
-				label = fmt.Sprintf("%.0f%%", a.viewer.currentScale()*100)
-			}
-			ui.Button(c.Key("zoom-actual"), label).FontSize(11).MinWidth(48).Label("100% 显示").Tooltip("按预览像素 100% 显示").Disabled(!ready).OnClick(func() { a.viewer.zoomCenter(1 / a.viewer.currentScale()) })
+			ui.Button(c.Key("zoom-fit-text"), "适合窗口").FontSize(11).MinWidth(68).Label("适合窗口").Tooltip("适合当前屏幕显示区域").Disabled(!ready).OnClick(a.viewer.reset)
 			iconButton(c, "zoom-in", "放大", iconPlus, false).Disabled(!ready).OnClick(func() { a.viewer.zoomCenter(1.25) })
-			iconButton(c, "zoom-fit", "适应窗口", iconFit, false).Tooltip("恢复适应窗口 · 0").Disabled(!ready).OnClick(a.viewer.reset)
 		})
 	})
+}
+
+func (a *app) edgeNavigation(c *ui.Context, key, label string, icon *ui.SVG, click func()) {
+	edge := ui.Box(c.Key(key)).Absolute().Top(0).Bottom(0).Width(112).Center().Padding(0, 10).OnClick(click).Cursor(ui.CursorPointer)
+	if c.Modifiers()&ui.Ctrl != 0 || a.viewer.pressed {
+		edge.PassThrough()
+	}
+	if key == "right-edge" {
+		edge = edge.Right(0)
+	} else {
+		edge = edge.Left(0)
+	}
+	if edge.Hovered() {
+		edge.Background(ui.Hex("#ffffff").Alpha(.08))
+		edge.Children(func() {
+			ui.Icon(c, icon).Size(34, 34).TextColor(ui.Hex("#eceeeb"))
+		})
+	}
+	edge.Label(label).Tooltip(label)
 }
 func (a *app) gridView(c *ui.Context) {
 	t := c.Theme()

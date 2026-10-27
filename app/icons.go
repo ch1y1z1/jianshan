@@ -16,6 +16,5 @@ var (
 	iconRight  = lineIcon(`<path d="m9 5 7 7-7 7"/>`)
 	iconMinus  = lineIcon(`<path d="M5 12h14"/>`)
 	iconPlus   = lineIcon(`<path d="M5 12h14m-7-7v14"/>`)
-	iconFit    = lineIcon(`<path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/>`)
 	iconReset  = lineIcon(`<path d="M3 10a9 9 0 1 1 2 8M3 4v6h6"/>`)
 )

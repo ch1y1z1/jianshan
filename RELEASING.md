@@ -10,10 +10,10 @@
 
 ## 发布新版
 
-每轮应用改动完成后都递增版本并发布安装包，例如 `0.1.1`、`0.1.2`。用户会手动更新软件进行测试，不以仅推送源码或生成本地构建作为交付完成。开发阶段只做与改动直接相关的最小检查，复用 CI 的必要检查，避免重复验证和启动测试实例。
+每轮应用改动完成后都递增版本并触发安装包发布，例如 `0.1.1`、`0.1.2`。用户会手动更新软件进行测试，不以仅推送源码或生成本地构建作为交付完成。推送代码和版本标签、触发 CI 后即可继续处理新需求，不必等待 CI 完成或确认发版结果。开发阶段只做与改动直接相关的最小检查，复用 CI 的必要检查，避免重复验证和启动测试实例。
 
 1. 修改 `app/mygo.json` 的 `version`，在 `app/CHANGELOG.md` 添加对应的 `## 0.1.1` 章节。应用版本和更新说明均由此读取。
-2. 提交并推送到 `main`，确认 CI 通过。
+2. 提交并推送到 `main`。
 3. 在相同提交创建并推送版本标签：
 
    ```sh
@@ -21,7 +21,7 @@
    git push origin v0.1.1
    ```
 
-4. 在 [Actions](https://github.com/ch1y1z1/jianshan/actions/workflows/release.yml) 查看构建，在 [Releases](https://github.com/ch1y1z1/jianshan/releases) 验收安装包。失败时可重新运行失败作业；若版本已公开，修复后发布新版本。
+4. [Actions](https://github.com/ch1y1z1/jianshan/actions/workflows/release.yml) 在后台构建并发布，用户从 [Releases](https://github.com/ch1y1z1/jianshan/releases) 或应用内更新获取安装包。触发流程后即可交付并处理新需求。失败时可重新运行失败作业；若版本已公开，修复后发布新版本。
 
 `app/cmd/releasecheck` 会阻止标签/版本不一致、空更新记录、目标平台缺失、归档大小或签名错误，并生成覆盖全部下载文件的 `SHA256SUMS`。下载归档和 delta 必须保留原名，供 `update-<target>.json` 引用。
 
