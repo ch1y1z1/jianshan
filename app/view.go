@@ -13,7 +13,7 @@ func (a *app) view(c *ui.Context) {
 	a.reconcileSelection()
 	c.OnShortcut(ui.Cmd, ui.KeyO, a.openFolder)
 	c.OnShortcut(0, ui.KeyG, a.toggleGrid)
-	c.OnShortcut(0, ui.KeyI, func() { a.infoOpen = !a.infoOpen })
+	c.OnShortcut(0, ui.KeyI, a.toggleInfo)
 	c.OnShortcut(0, ui.KeyLeft, func() {
 		if a.mode == viewSingle {
 			a.selectRelative(-1)
@@ -28,7 +28,8 @@ func (a *app) view(c *ui.Context) {
 		if a.viewer.pressed {
 			a.viewer.pressed, a.viewer.boxing = false, false
 		} else if a.toolsOpen {
-			a.toolsOpen, a.filterOpen = false, false
+			a.setToolsOpen(false)
+			a.filterOpen = false
 		} else if a.mode == viewSingle {
 			a.toggleGrid()
 		} else {
@@ -134,7 +135,7 @@ func (a *app) compactToolbar(c *ui.Context) {
 			ui.Text(c, count).FontSize(11).TextColor(t.TextMuted).SingleLine().MarginEnd(6)
 		}
 		if a.filter.active() {
-			ui.Button(c, "筛选中").FontSize(11).TextColor(t.Accent).OnClick(func() { a.toolsOpen, a.filterOpen = true, true })
+			ui.Button(c, "筛选中").FontSize(11).TextColor(t.Accent).OnClick(func() { a.setToolsOpen(true); a.filterOpen = true })
 		}
 		if a.mode == viewSingle {
 			iconButton(c, "grid", "网格", iconGrid, false).OnClick(a.toggleGrid)
@@ -144,8 +145,8 @@ func (a *app) compactToolbar(c *ui.Context) {
 			iconButton(c, "thumb-reset", "复原缩略图", iconReset, false).Tooltip("复原缩略图大小").OnClick(a.resetThumbnails)
 			iconButton(c, "single", "单图", iconSingle, false).OnClick(a.toggleGrid)
 		}
-		iconButton(c, "info", "信息", iconInfo, a.infoOpen).OnClick(func() { a.infoOpen = !a.infoOpen })
-		iconButton(c, "tools", "工具", iconTools, a.toolsOpen).OnClick(func() { a.toolsOpen = !a.toolsOpen })
+		iconButton(c, "info", "信息", iconInfo, a.infoOpen).OnClick(a.toggleInfo)
+		iconButton(c, "tools", "工具", iconTools, a.toolsOpen).OnClick(func() { a.setToolsOpen(!a.toolsOpen) })
 	})
 }
 func (a *app) toolsBar(c *ui.Context) {

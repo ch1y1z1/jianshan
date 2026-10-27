@@ -18,6 +18,7 @@ type app struct {
 	selected                        int
 	mode                            viewMode
 	infoOpen, toolsOpen, filterOpen bool
+	uiSettingsPath                  string
 	mainPercent                     float32
 	grid                            ui.GridState
 	gridSize                        float32

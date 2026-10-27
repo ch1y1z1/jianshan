@@ -33,6 +33,11 @@ func main() {
 	mygo.App.SetLocale("zh-Hans")
 	a.useUpdater()
 	mygo.App.WhenReady(func() {
+		if dir, err := mygo.App.Path(mygo.PathUserData); err == nil {
+			a.loadUISettings(filepath.Join(dir, "ui-settings.json"))
+		} else {
+			log.Printf("无法获取界面设置目录：%v", err)
+		}
 		a.setApplicationMenu()
 		a.win = mygo.NewWindow(mygo.WindowOptions{Title: "见山", Width: 1180, Height: 760, MinWidth: 760, MinHeight: 520, TitleBarStyle: mygo.TitleBarHiddenInset, TitleBarHeight: 44, BackgroundColor: "#17191b", StateKey: "jianshan.main", Content: ui.View(a.view)})
 		a.startWorkers()
