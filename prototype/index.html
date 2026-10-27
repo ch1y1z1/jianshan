@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>见山 · 图片查看器 UI 原型</title>
+<link rel="stylesheet" href="style.css">
+<script src="assets/lucide.min.js" defer></script><script src="app.js" defer></script>
+</head>
+<body>
+<div class="app" id="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><div class="brand-icon"><i data-lucide="scan-eye"></i></div><div><strong>见山</strong><span>每一帧，都值得看见。</span></div></div>
+    <button class="open-folder" id="openFolder"><i data-lucide="folder-open"></i>打开文件夹<kbd>⌘ O</kbd></button>
+    <div class="section-label">浏览</div>
+    <button class="nav-item active" id="allPhotos"><i data-lucide="images"></i>当前文件夹<span id="navCount">12</span></button>
+    <button class="nav-item" id="favoriteNav"><i data-lucide="star"></i>已加星标<span id="starCount">3</span></button>
+    <div class="section-label folders-label">文件夹<span class="micro-label">DEMO</span></div>
+    <div class="folder-root"><i data-lucide="chevron-down"></i><i data-lucide="folder"></i><span>我的照片</span></div>
+    <button class="folder-item selected" data-folder="all"><span class="tree-line"></span><i data-lucide="folder-open"></i><span>山野 · 秋日</span></button>
+    <button class="folder-item" data-folder="landscape"><span class="tree-line"></span><i data-lucide="folder"></i><span>山与湖</span><span class="item-count">7</span></button>
+    <button class="folder-item" data-folder="forest"><span class="tree-line last"></span><i data-lucide="folder"></i><span>林间漫步</span><span class="item-count">5</span></button>
+    <div class="section-label recent-label">最近打开</div>
+    <button class="recent-item" id="demoFolder"><i data-lucide="folder-clock"></i><span>山野 · 秋日<small>图片 / 2026 / 山野</small></span></button>
+    <div class="sidebar-bottom">
+      <div class="demo-note"><span class="status-dot"></span><span>示例文件夹</span><button class="icon-button" id="aboutBtn" aria-label="关于原型"><i data-lucide="circle-help"></i></button></div>
+      <div class="appearance-row"><span>外观</span><div class="theme-toggle" aria-label="外观模式"><button data-theme="light" aria-label="浅色"><i data-lucide="sun"></i></button><button data-theme="dark" class="active" aria-label="深色"><i data-lucide="moon"></i></button></div></div>
+    </div>
+  </aside>
+  <main class="main">
+    <header class="titlebar">
+      <div class="titlebar-left"><button class="icon-button sidebar-toggle" id="sidebarBtn" aria-label="切换文件夹侧栏"><i data-lucide="panel-left"></i></button><div class="breadcrumbs"><span>我的照片</span><i data-lucide="chevron-right"></i><span>2026</span><i data-lucide="chevron-right"></i><strong id="breadcrumbFolder">山野 · 秋日</strong></div></div>
+      <div class="titlebar-right"><span class="prototype-label">UI 概念稿</span><button class="icon-button" id="keyboardBtn" aria-label="键盘快捷键" title="键盘快捷键"><i data-lucide="keyboard"></i></button><button class="icon-button active" id="infoBtn" aria-label="切换信息面板" title="信息面板 · I"><i data-lucide="panel-right"></i></button></div>
+    </header>
+    <div class="workspace" id="workspace">
+      <section class="browser" id="browser">
+        <div class="content-head"><div class="heading-group"><p class="eyebrow">FOLDER / 文件夹</p><h1 id="folderTitle">山野 · 秋日<span class="folder-count" id="folderCount">12</span></h1><p class="folder-description" id="folderDescription">把山间的光，留在这一帧。</p></div><div class="head-actions"><label class="search-box"><i data-lucide="search"></i><input id="search" type="search" placeholder="搜索文件名…" aria-label="搜索文件名"><kbd>⌘ F</kbd></label></div></div>
+        <div class="controls-row">
+          <div class="view-switch" role="group" aria-label="视图"><button id="gridView" class="active" aria-label="缩略图视图"><i data-lucide="layout-grid"></i></button><button id="singleView" aria-label="单张视图"><i data-lucide="rectangle-horizontal"></i></button></div>
+          <div class="control-divider"></div>
+          <div class="popover-anchor"><button class="text-button" id="sortBtn" aria-haspopup="true" aria-expanded="false"><i data-lucide="arrow-down-wide-narrow"></i><span id="sortLabel">拍摄时间</span><i class="small-icon" data-lucide="chevron-down"></i></button><div class="popover sort-popover" id="sortPopover" hidden><div class="popover-title">排序依据</div><div id="sortOptions"></div></div></div>
+          <button class="icon-button order-button" id="orderBtn" aria-label="切换排序方向" title="切换为降序"><i data-lucide="arrow-up"></i></button>
+          <div class="controls-spacer"></div>
+          <button class="text-button format-toggle" id="formatToggle" aria-expanded="false"><i data-lucide="file-type-2"></i><span>格式</span></button><div class="popover-anchor"><button class="text-button filter-button" id="filterBtn" aria-haspopup="true" aria-expanded="false"><i data-lucide="sliders-horizontal"></i><span>筛选</span><span class="filter-counter" id="filterCounter" hidden>0</span></button><div class="popover filter-popover" id="filterPopover" hidden><div class="popover-title">精细筛选<button class="subtle-link" id="resetAdvanced">重置</button></div><label class="field">相机<select id="cameraFilter"><option value="">所有相机</option></select></label><label class="field">画面方向<select id="orientationFilter"><option value="">不限</option><option value="landscape">横向</option><option value="portrait">纵向</option></select></label><div class="field">ISO 范围<div class="range-fields"><input type="number" id="isoMin" placeholder="最低" min="0" aria-label="ISO 最低值"><span>—</span><input type="number" id="isoMax" placeholder="最高" min="0" aria-label="ISO 最高值"></div></div><label class="field">拍摄日期<input type="date" id="dateFilter" aria-label="拍摄日期"></label><label class="checkbox-row"><input type="checkbox" id="starFilter">只看已加星标</label></div></div>
+        </div>
+        <div class="format-row" id="formatRow" aria-label="按后缀名筛选"></div>
+        <div class="active-filters" id="activeFilters" hidden></div>
+        <div class="gallery-area" id="galleryArea"><div class="photo-grid" id="photoGrid" role="list" aria-label="图片缩略图"></div><div class="empty-state" id="emptyState" hidden><div class="empty-icon"><i data-lucide="search-x"></i></div><h2>没有匹配的图片</h2><p>试试其他文件格式，或清除当前筛选。</p><button class="primary-button" id="clearEmpty">清除筛选</button></div>
+        <div class="single-view" id="singleArea" hidden><div class="viewer-top"><div class="viewer-top-left"><button class="icon-button" id="miniOpen" aria-label="打开文件夹" title="打开文件夹"><i data-lucide="folder-open"></i></button><button class="text-button mini-folder-button" id="miniFolderButton" aria-label="显示文件夹"><span id="miniFolderName">山野 · 秋日</span><i data-lucide="chevron-down"></i></button></div><div class="viewer-top-center"><button class="text-button" id="backToGrid"><i data-lucide="layout-grid"></i>网格</button></div><div class="viewer-top-right"><button class="text-button" id="miniToolsButton"><i data-lucide="sliders-horizontal"></i>工具</button><button class="icon-button" id="miniFilmstripButton" aria-label="显示胶片栏" title="显示胶片栏"><i data-lucide="film"></i></button><button class="icon-button active" id="miniInfoButton" aria-label="切换信息面板" title="信息面板"><i data-lucide="panel-right"></i></button><span id="singlePosition">1 / 12</span></div><div class="mini-tools-menu" id="miniToolsMenu" hidden><button type="button" data-mini-action="grid">网格浏览</button><button type="button" data-mini-action="sort">排序与筛选</button><button type="button" data-mini-action="folder">打开其他文件夹</button></div></div><div class="image-stage" id="imageStage"><img id="singleImage" alt=""><button class="stage-nav prev" id="prevBtn" aria-label="上一张"><i data-lucide="chevron-left"></i></button><button class="stage-nav next" id="nextBtn" aria-label="下一张"><i data-lucide="chevron-right"></i></button></div><div class="viewer-bottom"><div class="viewer-file"><strong id="singleName"></strong><span id="previewMode">相机内嵌预览</span></div><div class="zoom-control"><button class="icon-button" id="zoomOut" aria-label="缩小"><i data-lucide="minus"></i></button><button class="zoom-label" id="zoomFit">适应窗口</button><button class="icon-button" id="zoomIn" aria-label="放大"><i data-lucide="plus"></i></button></div><button class="icon-button" id="fullscreenBtn" aria-label="全屏查看"><i data-lucide="maximize"></i></button></div><div class="filmstrip" id="filmstrip" aria-label="图片胶片栏" hidden></div></div></div>
+        <footer class="browser-footer"><div class="footer-count"><span class="status-dot"></span><span id="resultCount" aria-live="polite">12 张图片</span><span class="footer-dot">·</span><span id="selectionCount">已选择 1 张</span></div><div class="thumbnail-size" id="thumbnailControl"><i data-lucide="image"></i><input type="range" id="thumbSize" min="140" max="260" value="174" aria-label="缩略图大小"><i data-lucide="images"></i></div></footer>
+      </section>
+      <aside class="inspector" id="inspector" aria-label="图片元数据"><div class="inspector-top"><h2>照片信息</h2><div><button class="icon-button" id="copyInfoBtn" aria-label="复制拍摄信息" title="复制拍摄信息"><i data-lucide="copy"></i></button><button class="icon-button" id="closeInfoBtn" aria-label="关闭信息面板"><i data-lucide="x"></i></button></div></div><div class="inspector-scroll" id="inspectorContent"></div></aside>
+    </div>
+  </main>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+<dialog id="dialog"><div class="dialog-head"><h2 id="dialogTitle"></h2><button class="icon-button" id="dialogClose" aria-label="关闭对话框"><i data-lucide="x"></i></button></div><div id="dialogContent"></div></dialog>
+<input type="file" id="folderInput" webkitdirectory multiple hidden>
+</body>
+</html>

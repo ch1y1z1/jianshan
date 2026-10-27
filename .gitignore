@@ -1,0 +1,15 @@
+.DS_Store
+.research/
+app/build/
+app/.mygo/
+app/jianshan
+
+# Local signing credentials and acceptance-test artifacts.
+mygo-update.key
+update-keys/
+*.p12
+*.pfx
+.env
+.env.*
+app/screenshots/raw.png
+release-assets/

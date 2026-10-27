@@ -1,0 +1,51 @@
+{
+  "name": "见山",
+  "identifier": "com.chiyizi.jianshan",
+  "slug": "jianshan",
+  "version": "0.1.0",
+  "out": "build",
+  "macos": {
+    "minimumSystemVersion": "13.0"
+  },
+  "linux": {
+    "comment": "图片查看器",
+    "categories": [
+      "Graphics",
+      "Photography",
+      "Viewer"
+    ],
+    "webview": false
+  },
+  "fileAssociations": [
+    {
+      "name": "图片",
+      "role": "Viewer",
+      "ext": [
+        "jpg",
+        "jpeg",
+        "png",
+        "webp",
+        "gif",
+        "bmp",
+        "tif",
+        "tiff",
+        "cr2",
+        "cr3",
+        "nef",
+        "nrw",
+        "arw",
+        "raf",
+        "orf",
+        "rw2",
+        "dng",
+        "pef",
+        "srw"
+      ]
+    }
+  ],
+  "updates": {
+    "publicKey": "qm/pJaoJzb/LV7es6VNzsQ9P412V4B7NA7KiH1gp/5o=",
+    "github": "ch1y1z1/jianshan",
+    "deltas": 3
+  }
+}
