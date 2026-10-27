@@ -25,6 +25,7 @@ const (
 type imageKey struct {
 	path  string
 	large bool
+	edge  int
 }
 type imageEntry struct {
 	bitmap  *ui.Bitmap
@@ -46,10 +47,23 @@ type previewJob struct {
 // All cache state is owned by the UI thread. At most two decoding workers
 // run concurrently; folder changes cancel outstanding work and stale results
 // cannot enter the next folder's cache.
-func (a *app) image(p photo, large bool) (*ui.Bitmap, error, bool) {
-	key := imageKey{p.Path, large}
+func (a *app) image(p photo, large bool, requestedEdge ...int) (*ui.Bitmap, error, bool) {
+	edge := thumbnailEdge
+	if large {
+		edge = previewEdge
+	}
+	if len(requestedEdge) > 0 && requestedEdge[0] > 0 {
+		edge = requestedEdge[0]
+	}
+	edge = imageEdgeBucket(edge)
+	key := imageKey{path: p.Path, large: large, edge: edge}
 	a.cacheClock++
 	if e := a.images[key]; e != nil {
+		e.used = a.cacheClock
+		return e.bitmap, e.err, e.pending
+	}
+	// Keep compatibility with entries created before size-aware keys existed.
+	if e := a.images[imageKey{path: p.Path, large: large}]; e != nil {
 		e.used = a.cacheClock
 		return e.bitmap, e.err, e.pending
 	}
@@ -59,51 +73,116 @@ func (a *app) image(p photo, large bool) (*ui.Bitmap, error, bool) {
 	ctx, cancel := context.WithCancel(a.ctx)
 	e := &imageEntry{pending: true, used: a.cacheClock, cancel: cancel}
 	job := previewJob{key: key, photo: p, generation: a.generation, ctx: ctx, entry: e}
+	a.images[key] = e
 	select {
-	case a.jobs <- job:
-		a.images[key] = e
+	case a.previewQueue(large) <- job:
 	default:
+		delete(a.images, key)
 		cancel()
 		// The visible cells retry on the frame produced by the next completion.
 	}
 	return nil, nil, true
 }
+
+func (a *app) previewQueue(large bool) chan previewJob {
+	if large {
+		return a.urgentJobs
+	}
+	return a.jobs
+}
+
+func imageEdgeBucket(edge int) int {
+	edge = max(1, min(previewEdge, edge))
+	if edge <= thumbnailEdge {
+		return thumbnailEdge
+	}
+	return ((edge + 255) / 256) * 256
+}
+
+func (a *app) cachedImage(p photo, large bool) *ui.Bitmap {
+	var best *imageEntry
+	for key, entry := range a.images {
+		if key.path == p.Path && key.large == large && !entry.pending && entry.bitmap != nil {
+			if best == nil || key.edge > 0 && key.edge > imageEdgeBucket(thumbnailEdge) {
+				best = entry
+			}
+		}
+	}
+	if best == nil {
+		return nil
+	}
+	a.cacheClock++
+	best.used = a.cacheClock
+	return best.bitmap
+}
+
 func (a *app) startWorkers() {
 	for range 2 {
 		go func() {
-			for job := range a.jobs {
-				if job.ctx.Err() != nil {
-					continue
-				}
-				edge := thumbnailEdge
-				if job.key.large {
-					edge = previewEdge
-				}
-				img, err := decodePhoto(job.ctx, job.photo, edge)
-				if job.ctx.Err() != nil {
-					continue
-				}
-				// Constructing a bitmap doesn't touch a renderer. Ownership transfers
-				// to the UI thread when the completion callback runs.
-				var bitmap *ui.Bitmap
-				var size int64
-				if err == nil {
-					bitmap = ui.NewBitmap(img)
-					b := img.Bounds()
-					size = int64(b.Dx()) * int64(b.Dy()) * 4
-				}
-				a.win.Update(func() {
-					if a.generation != job.generation || a.images[job.key] != job.entry {
+			for {
+				// Poll the urgent queue first so opening a photo is not stuck
+				// behind thumbnails that were requested by the grid.
+				select {
+				case job, ok := <-a.urgentJobs:
+					if !ok {
 						return
 					}
-					job.entry.cancel()
-					job.entry.cancel = nil
-					job.entry.bitmap, job.entry.err, job.entry.pending, job.entry.bytes = bitmap, err, false, size
-					a.trimImages(job.key.large, job.key)
-				})
+					a.processPreviewJob(job)
+				default:
+					select {
+					case job, ok := <-a.urgentJobs:
+						if !ok {
+							return
+						}
+						a.processPreviewJob(job)
+					case job, ok := <-a.jobs:
+						if !ok {
+							return
+						}
+						a.processPreviewJob(job)
+					}
+				}
 			}
 		}()
 	}
+}
+
+func (a *app) processPreviewJob(job previewJob) {
+	if job.ctx.Err() != nil {
+		return
+	}
+	edge := job.key.edge
+	if edge <= 0 {
+		if job.key.large {
+			edge = previewEdge
+		} else {
+			edge = thumbnailEdge
+		}
+	}
+	img, err := decodePhoto(job.ctx, job.photo, edge)
+	if job.ctx.Err() != nil {
+		return
+	}
+	// Constructing a bitmap doesn't touch a renderer. Ownership transfers
+	// to the UI thread when the completion callback runs.
+	var bitmap *ui.Bitmap
+	var size int64
+	if err == nil {
+		bitmap = ui.NewBitmap(img)
+		b := img.Bounds()
+		size = int64(b.Dx()) * int64(b.Dy()) * 4
+	}
+	a.win.Update(func() {
+		if a.generation != job.generation || a.images[job.key] != job.entry {
+			return
+		}
+		if job.entry.cancel != nil {
+			job.entry.cancel()
+			job.entry.cancel = nil
+		}
+		job.entry.bitmap, job.entry.err, job.entry.pending, job.entry.bytes = bitmap, err, false, size
+		a.trimImages(job.key.large, job.key)
+	})
 }
 func (a *app) trimImages(large bool, keep imageKey) {
 	budget := int64(thumbnailBudget)
@@ -156,18 +235,21 @@ func decodePhoto(ctx context.Context, p photo, edge int) (image.Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-	if cfg.Width <= 0 || cfg.Height <= 0 || int64(cfg.Width)*int64(cfg.Height) > 120_000_000 {
-		return nil, errors.New("图片尺寸超过当前版本的读取范围")
+	jpegLike := p.isRaw() || p.Ext == ".jpg" || p.Ext == ".jpeg"
+	if !jpegLike {
+		cfg, _, decodeErr := image.DecodeConfig(bytes.NewReader(data))
+		if decodeErr != nil {
+			return nil, decodeErr
+		}
+		if cfg.Width <= 0 || cfg.Height <= 0 || int64(cfg.Width)*int64(cfg.Height) > 120_000_000 {
+			return nil, errors.New("图片尺寸超过当前版本的读取范围")
+		}
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	var img image.Image
-	if p.isRaw() || p.Ext == ".jpg" || p.Ext == ".jpeg" {
+	if jpegLike {
 		img, err = decodeJPEGAtSize(data, edge, edge <= thumbnailEdge)
 	} else {
 		img, _, err = image.Decode(bytes.NewReader(data))

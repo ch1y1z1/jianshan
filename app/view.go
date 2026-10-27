@@ -286,14 +286,36 @@ func (a *app) imageStage(c *ui.Context) {
 	}
 	items := a.visiblePhotos()
 	idx := a.currentVisibleIndex(items)
+	previewTarget := a.singlePreviewEdge(c)
 	ui.Column(c.Key("single-stage")).Fill().MinHeight(0).Background(ui.Hex("#111315")).Children(func() {
 		ui.Box(c.Key("image-area")).Grow(1).MinHeight(0).Center().Children(func() {
-			bm, err, pending := a.image(p, true)
+			var placeholder *ui.Bitmap
+			if p.Ext == ".jpg" || p.Ext == ".jpeg" || p.isRaw() {
+				placeholder = a.cachedImage(p, false)
+				if placeholder == nil {
+					// Decode a small first frame before the window-sized preview on
+					// direct opens. This avoids a blank stage and avoids decoding both
+					// sizes at the same time when no grid was visited first.
+					low, _, lowPending := a.image(p, false)
+					placeholder = low
+					if lowPending && low == nil {
+						ui.Text(c, "正在读取图片…").TextColor(t.TextMuted).FontSize(12)
+						return
+					}
+				}
+			}
+			bm, err, pending := a.image(p, true, previewTarget)
 			switch {
 			case bm != nil:
 				a.photoCanvas(c, bm)
 			case pending:
-				ui.Text(c, "正在读取图片…").TextColor(t.TextMuted).FontSize(12)
+				if placeholder != nil {
+					// The grid bitmap gives immediate feedback while the window-sized
+					// preview is decoded in the urgent queue.
+					a.photoCanvas(c, placeholder)
+				} else {
+					ui.Text(c, "正在读取图片…").TextColor(t.TextMuted).FontSize(12)
+				}
 			default:
 				ui.Column(c).Center().Gap(8).Children(func() {
 					ui.Text(c, "无法显示这张图片").TextColor(ui.Hex("#eceeeb"))
@@ -319,6 +341,19 @@ func (a *app) imageStage(c *ui.Context) {
 			iconButton(c, "zoom-in", "放大", iconPlus, false).Disabled(!ready).OnClick(func() { a.viewer.zoomCenter(1.25) })
 		})
 	})
+}
+
+// The preview only needs to cover the current photo area at screen density.
+// Bucketing keeps small window resizes from creating a new decode every frame.
+func (a *app) singlePreviewEdge(c *ui.Context) int {
+	w, h := a.viewer.viewport.W, a.viewer.viewport.H
+	if w <= 0 || h <= 0 {
+		w, h = c.Size()
+		if a.infoOpen && a.mainPercent > 0 {
+			w *= a.mainPercent / 100
+		}
+	}
+	return imageEdgeBucket(int(max(w, h) * 2))
 }
 
 func (a *app) edgeNavigation(c *ui.Context, key, label string, icon *ui.SVG, click func()) {

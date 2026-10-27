@@ -122,9 +122,42 @@ func (a *app) pruneImageCache(visible []photo) {
 	// All queued requests belong to the previous viewport. Empty the queue
 	// now, so a full queue of canceled work cannot prevent a new frame from
 	// enqueueing images (canceled workers publish no completion frame).
+	a.drainPreviewQueues()
+}
+
+// A switch from the grid to one photo makes queued thumbnail work obsolete.
+// Running decoders notice cancellation; queued jobs are drained so the next
+// high-priority photo request can enter immediately.
+func (a *app) cancelPendingThumbnails() {
+	for key, entry := range a.images {
+		if !key.large && entry.pending {
+			if entry.cancel != nil {
+				entry.cancel()
+			}
+			delete(a.images, key)
+		}
+	}
+	a.drainNormalQueue()
+}
+
+func (a *app) drainNormalQueue() {
 	for {
 		select {
 		case _, open := <-a.jobs:
+			if !open {
+				return
+			}
+		default:
+			return
+		}
+	}
+}
+
+func (a *app) drainPreviewQueues() {
+	a.drainNormalQueue()
+	for {
+		select {
+		case _, open := <-a.urgentJobs:
 			if !open {
 				return
 			}

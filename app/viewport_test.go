@@ -12,7 +12,7 @@ func TestPhotoViewportInteractions(t *testing.T) {
 	a := newApp()
 	a.photos = []photo{testPhoto("photo.jpg", ".jpg", time.Now())}
 	a.selected = 0
-	a.images[imageKey{a.photos[0].Path, true}] = &imageEntry{bitmap: ui.NewBitmap(image.NewRGBA(image.Rect(0, 0, 1200, 800)))}
+	a.images[imageKey{path: a.photos[0].Path, large: true}] = &imageEntry{bitmap: ui.NewBitmap(image.NewRGBA(image.Rect(0, 0, 1200, 800)))}
 	tt := ui.NewTester(a.view, 1000, 700)
 	tt.Frame()
 	r, ok := tt.Find("图片预览")

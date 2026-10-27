@@ -41,7 +41,7 @@ func main() {
 		a.setApplicationMenu()
 		a.win = mygo.NewWindow(mygo.WindowOptions{Title: "见山", Width: 1180, Height: 760, MinWidth: 760, MinHeight: 520, TitleBarStyle: mygo.TitleBarHiddenInset, TitleBarHeight: 44, BackgroundColor: "#17191b", StateKey: "jianshan.main", Content: ui.View(a.view)})
 		a.startWorkers()
-		a.win.OnClosed(func() { a.cancel(); close(a.jobs) })
+		a.win.OnClosed(func() { a.cancel(); close(a.jobs); close(a.urgentJobs) })
 		if len(os.Args) > 1 {
 			if path, err := filepath.Abs(os.Args[1]); err == nil {
 				a.loadFolderAsync(path)
