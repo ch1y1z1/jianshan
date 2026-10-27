@@ -139,6 +139,9 @@ func (a *app) compactToolbar(c *ui.Context) {
 		if a.mode == viewSingle {
 			iconButton(c, "grid", "网格", iconGrid, false).OnClick(a.toggleGrid)
 		} else {
+			iconButton(c, "thumb-smaller", "减小缩略图", iconMinus, false).Tooltip("减小缩略图 · Ctrl + 滚轮向下").Disabled(a.gridSize <= minGridSize).OnClick(func() { a.resizeThumbnails(a.gridSize - gridSizeStep) })
+			iconButton(c, "thumb-larger", "增大缩略图", iconPlus, false).Tooltip("增大缩略图 · Ctrl + 滚轮向上").Disabled(a.gridSize >= maxGridSize).OnClick(func() { a.resizeThumbnails(a.gridSize + gridSizeStep) })
+			iconButton(c, "thumb-reset", "复原缩略图", iconReset, false).Tooltip("复原缩略图大小").OnClick(a.resetThumbnails)
 			iconButton(c, "single", "单图", iconSingle, false).OnClick(a.toggleGrid)
 		}
 		iconButton(c, "info", "信息", iconInfo, a.infoOpen).OnClick(func() { a.infoOpen = !a.infoOpen })
@@ -318,7 +321,7 @@ func (a *app) imageStage(c *ui.Context) {
 func (a *app) gridView(c *ui.Context) {
 	t := c.Theme()
 	items := a.visiblePhotos()
-	grid := ui.GridView(c.Key("photo-grid"), &a.grid, len(items), 164, 154, func(i int) {
+	grid := ui.GridView(c.Key("photo-grid"), &a.grid, len(items), a.gridSize, a.gridSize-10, func(i int) {
 		p := items[i]
 		ui.Column(c).Fill().Padding(5).Gap(7).Children(func() {
 			ui.Box(c).Grow(1).MinHeight(0).Center().Background(ui.Hex("#111315")).Radius(3).Clip().Children(func() {
@@ -338,6 +341,7 @@ func (a *app) gridView(c *ui.Context) {
 			ui.Text(c, p.Name).FontSize(11).TextColor(t.TextMuted).SingleLine()
 		})
 	}).Fill().Padding(12)
+	grid.HandleInput(a.gridInput)
 	grid.OnChange(func() { a.selectVisible(a.visiblePhotos(), a.gridSelected) })
 	grid.OnSubmit(func() { a.selectVisible(a.visiblePhotos(), a.gridSelected); a.viewer.reset(); a.mode = viewSingle })
 	if a.focusGrid {

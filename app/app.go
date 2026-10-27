@@ -20,6 +20,7 @@ type app struct {
 	infoOpen, toolsOpen, filterOpen bool
 	mainPercent                     float32
 	grid                            ui.GridState
+	gridSize                        float32
 	gridSelected                    int
 	focusGrid                       bool
 	viewer                          imageViewport
@@ -47,7 +48,7 @@ type app struct {
 
 func newApp() *app {
 	ctx, cancel := context.WithCancel(context.Background())
-	a := &app{selected: -1, gridSelected: -1, mode: viewSingle, infoOpen: true, mainPercent: 77, ctx: ctx, cancel: cancel, jobs: make(chan previewJob, 64), images: make(map[imageKey]*imageEntry)}
+	a := &app{selected: -1, gridSelected: -1, mode: viewSingle, infoOpen: true, mainPercent: 77, gridSize: defaultGridSize, ctx: ctx, cancel: cancel, jobs: make(chan previewJob, 64), images: make(map[imageKey]*imageEntry)}
 	a.grid.Selected = &a.gridSelected
 	a.grid.Label = func(i int) string {
 		items := a.visiblePhotos()
