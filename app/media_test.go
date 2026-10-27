@@ -48,6 +48,37 @@ func jpegFixture(t *testing.T, w, h int) []byte {
 	return b.Bytes()
 }
 
+func TestJPEGThumbnailExtraction(t *testing.T) {
+	thumb := jpegFixture(t, 24, 16)
+	// TIFF header, empty IFD0, then IFD1 with JPEGInterchangeFormat tags.
+	tiff := make([]byte, 44)
+	copy(tiff, "II")
+	binary.LittleEndian.PutUint16(tiff[2:], 42)
+	binary.LittleEndian.PutUint32(tiff[4:], 8)
+	binary.LittleEndian.PutUint32(tiff[10:], 14)
+	binary.LittleEndian.PutUint16(tiff[14:], 2)
+	binary.LittleEndian.PutUint16(tiff[16:], 0x0201)
+	binary.LittleEndian.PutUint16(tiff[18:], 4)
+	binary.LittleEndian.PutUint32(tiff[20:], 1)
+	binary.LittleEndian.PutUint32(tiff[24:], uint32(len(tiff)))
+	binary.LittleEndian.PutUint16(tiff[28:], 0x0202)
+	binary.LittleEndian.PutUint16(tiff[30:], 4)
+	binary.LittleEndian.PutUint32(tiff[32:], 1)
+	binary.LittleEndian.PutUint32(tiff[36:], uint32(len(thumb)))
+	app1 := append([]byte("Exif\x00\x00"), tiff...)
+	app1 = append(app1, thumb...)
+	data := []byte{0xff, 0xd8, 0xff, 0xe1, byte((len(app1) + 2) >> 8), byte(len(app1) + 2)}
+	data = append(data, app1...)
+	got, err := jpegThumbnailFromData(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(got))
+	if err != nil || cfg.Width != 24 || cfg.Height != 16 {
+		t.Fatalf("thumbnail config = %+v, %v", cfg, err)
+	}
+}
+
 // Real EXIF byte layouts, including inline SHORT values and offset RATIONALs.
 // The same fixture is generated in both TIFF byte orders.
 func exifJPEG(t *testing.T, order binary.ByteOrder) []byte {

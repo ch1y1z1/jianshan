@@ -4,6 +4,7 @@ go 1.27.3
 
 require (
 	github.com/egoist/mygo v0.7.2-0.20261027092812-b553a90aefc5
+	github.com/gen2brain/jpegn v0.6.1
 	golang.org/x/image v0.46.0
 )
 

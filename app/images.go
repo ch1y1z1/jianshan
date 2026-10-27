@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/gen2brain/jpegn"
 	"golang.org/x/image/draw"
 )
 
@@ -140,6 +141,13 @@ func decodePhoto(ctx context.Context, p photo, edge int) (image.Image, error) {
 	var err error
 	if p.isRaw() {
 		data, err = rawPreview(ctx, p.Path)
+	} else if edge <= thumbnailEdge && (p.Ext == ".jpg" || p.Ext == ".jpeg") {
+		// EXIF thumbnails are already close to grid size and avoid decoding the
+		// camera's full-resolution JPEG. The complete file remains the fallback.
+		data, err = readJPEGThumbnail(ctx, p.Path)
+		if err != nil {
+			data, err = readEncoded(p.Path, 512<<20)
+		}
 	} else {
 		// A single encoded file is read only when it is needed. Bound it so an
 		// invalid multi-gigabyte file cannot exhaust the process before decoding.
@@ -158,7 +166,12 @@ func decodePhoto(ctx context.Context, p photo, edge int) (image.Image, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	img, _, err := image.Decode(bytes.NewReader(data))
+	var img image.Image
+	if p.isRaw() || p.Ext == ".jpg" || p.Ext == ".jpeg" {
+		img, err = decodeJPEGAtSize(data, edge, edge <= thumbnailEdge)
+	} else {
+		img, _, err = image.Decode(bytes.NewReader(data))
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -177,6 +190,23 @@ func decodePhoto(ctx context.Context, p photo, edge int) (image.Image, error) {
 	dst := image.NewRGBA(image.Rect(0, 0, max(1, int(float64(b.Dx())*scale)), max(1, int(float64(b.Dy())*scale))))
 	draw.ApproxBiLinear.Scale(dst, dst.Bounds(), img, b, draw.Src, nil)
 	return dst, nil
+}
+
+func decodeJPEGAtSize(data []byte, edge int, fast bool) (image.Image, error) {
+	cfg, err := jpegn.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	denom := 1
+	maxDimension := max(cfg.Width, cfg.Height)
+	for denom < 8 && maxDimension/(denom*2) >= max(1, edge) {
+		denom *= 2
+	}
+	method := jpegn.CatmullRom
+	if fast {
+		method = jpegn.NearestNeighbor
+	}
+	return jpegn.Decode(bytes.NewReader(data), &jpegn.Options{ScaleDenom: denom, UpsampleMethod: method})
 }
 func readEncoded(path string, limit int64) ([]byte, error) {
 	f, err := os.Open(path)
